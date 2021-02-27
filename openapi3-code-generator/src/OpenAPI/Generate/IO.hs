@@ -44,7 +44,7 @@ cabalProjectFiles ::
 cabalProjectFiles packageName moduleName modulesToExport =
   [ ( packageName ++ ".cabal",
       unlines $
-        [ "cabal-version: 1.12",
+        [ "Cabal-version:  2.2",
           "",
           "name:           " ++ packageName,
           "version:        0.1.0.0",
