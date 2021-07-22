@@ -21,6 +21,7 @@ import Control.Monad
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Text as Aeson
 import qualified Data.Bifunctor as BF
+import qualified Data.Bool
 import qualified Data.Either as E
 import qualified Data.Int as Int
 import qualified Data.Map as Map
@@ -708,19 +709,22 @@ propertiesToBangTypes _ [] _ = pure (pure [], emptyDoc, Set.empty)
 propertiesToBangTypes schemaName props required = OAM.nested "properties" $ do
   propertySuffix <- OAM.getFlag OAO.flagPropertyTypeSuffix
   convertToCamelCase <- OAM.getFlag OAO.flagConvertToCamelCase
-  let createBang :: Text -> Text -> Q Type -> Q VarBangType
-      createBang recordName propName myType = do
+  let createBang :: Text -> Text -> Bool -> Q Type -> Q VarBangType
+      createBang recordName propName propNullable myType = do
         bang' <- bang noSourceUnpackedness noSourceStrictness
         type' <-
-          if recordName `elem` required
+          if recordName `elem` required && Data.Bool.not propNullable
             then myType
             else appT (varT ''Maybe) myType
         pure (haskellifyName convertToCamelCase False propName, bang', type')
       propToBangType :: (Text, OAS.Schema) -> OAM.Generator (Q VarBangType, Q Doc, Dep.Models)
       propToBangType (recordName, schema) = do
+        let propNullable = case schema of
+              OAT.Concrete (OAS.SchemaObject {nullable = True}) -> True
+              _ -> False
         let propName = schemaName <> uppercaseFirstText recordName
         (myType, (content, depenencies)) <- OAM.nested recordName $ defineModelForSchemaNamed (propName <> propertySuffix) schema
-        let myBang = createBang recordName propName myType
+        let myBang = createBang recordName propName propNullable myType
         pure (myBang, content, depenencies)
       foldFn :: OAM.Generator BangTypesSelfDefined -> (Text, OAS.Schema) -> OAM.Generator BangTypesSelfDefined
       foldFn accHolder next = do
